@@ -1,40 +1,37 @@
-import { AxiosRequestConfig, Method } from './types/config'
+import { AxiosRequestConfig, AxiosPromise } from './types/config'
+import { parseHeaders } from './libs/headers'
 
-export function xhr(config: AxiosRequestConfig): void {
-  const { data = null, method = 'get', url, params = null } = config
-  let resolvedUrl = genUrl(config)
-  const request = new XMLHttpRequest()
+export function xhr(config: AxiosRequestConfig): AxiosPromise {
+  return new Promise((resolve, reject) => {
+    const { data = null, method = 'get', url, headers, responseType /*, params = null */ } = config
+    const request = new XMLHttpRequest()
 
-  request.open(method.toUpperCase(), resolvedUrl, true)
-
-  request.send(data)
-}
-
-function genUrl(config: AxiosRequestConfig): string {
-  const { data = null, method = 'get', url: baseUrl, params = null } = config
-  let resultUrl: string = baseUrl
-  if (params) resultUrl += parseParams(params)
-  return resultUrl
-}
-
-function parseParams(params: { [index: string]: any }): string {
-  if (!params) return ''
-  let str = '?'
-  for (let [key, value] of Object.entries(params)) {
-    str += `${key}=${value}&`
-  }
-  str = str.substring(0, str.length - 1)
-  return str
-}
-
-console.log(
-  genUrl({
-    url: 'https://dtwu.club',
-    method: 'get',
-    params: {
-      name: 'Doctorwu',
-      age: 18,
-      company: 'tencent:D'
+    if (responseType) {
+      request.responseType = responseType
     }
+
+    request.open(method.toUpperCase(), url, true)
+
+    request.onreadystatechange = function loadData() {
+      if (request.readyState !== 4) {
+        return
+      }
+      const responseHeaders = parseHeaders(request.getAllResponseHeaders())
+      const responseData =
+        request.responseType.toLowerCase() !== 'text' ? request.response : request.responseText
+
+      resolve({
+        headers: responseHeaders,
+        data: responseData,
+        status: request.status,
+        statusText: request.statusText,
+        config,
+        request
+      })
+    }
+    Object.keys(headers).forEach(name => {
+      request.setRequestHeader(name, headers[name])
+    })
+    request.send(data)
   })
-)
+}
